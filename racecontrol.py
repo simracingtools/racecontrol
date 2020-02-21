@@ -304,7 +304,7 @@ if __name__ == '__main__':
     # Read configuration file
     config = configparser.ConfigParser()    
     try: 
-        config.read('irtactics.ini')
+        config.read('racecontrol.ini')
     except Exception as ex:
         print('unable to read configuration: ' + str(ex))
         sys.exit(1)

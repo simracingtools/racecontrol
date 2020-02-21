@@ -1,39 +1,23 @@
-# Teamtactics
+# Racecontrol
 
-This application is intended to collect realtime telemetry from iRacing team
+This application is intended to collect driver events from iRacing team
 members during a team event.
 
 ## Problem
 
-Some of the telemetry data in iRacing is delayed for all currently not driving
-team members because of anti-cheat reasons.
-This affects some data which is needed to calculate driving tactics, especially
-- but not only - fuel data.
+If you try to do appropriate live race control in iRacing then you are likely
+to miss important events like pitstops or driver changes.
 
 ## Solution
 
-If all team members are running the teamtactics client, the following telemetry
-data is collected and aggregated into a Google Firestore database:
+If racecontrol runs this script the following events of each driver are
+recorded along with a timestamp:
 
-* LapCompleted
-* LapLastLapTime
-* Driver Customer-ID
-* FuelUsed
-* FuelLevel
-* OnPitRoad
-* TrackTemp
-* PitSvFlags
-* SessionTime
-* PlayerCarTowTime
-* PitRepairLeft
-* PitOptRepairLeft
-* SessionTimeOfDay when entering/exiting pits and stop/start moving in pits
-
-In addition a stint number and lap number in stint is calculated based to the
-pit entry/exit events.
-
-With this information the team's strategy can be calculated based on near realtime data.
-A client which makes use of this data is subject of another project.
+* Approaching pits
+* Enter pitlane
+* In pit stalls
+* Driver change
+* Exit pitlane
 
 ## Configuration and usage
 
@@ -45,9 +29,6 @@ A client which makes use of this data is subject of another project.
 	# directory as teamtactics.exe
 	firebase = <firestoreCedentials.json>
 
-	# Each team member has to configure its own iRacing ID here
-	iracingId = <your iRacingId>
-	
 	# Proxy configuration. The given URL will be used as Proxy on both http and 
 	# https protocol
 	;proxy = <Proxy URL>
@@ -66,32 +47,20 @@ A client which makes use of this data is subject of another project.
 
 To start a session recording:
 
-	teamtactics.exe
+	python racecontrol.py
 	
 ## Data collections
 
-All session data is gathered within a Firestore collection. For a single session the
-collection name will be
-
-	<UserName>@<car>#<track>#<SessionNumber>
-	
-, for a team session
+All session data is gathered within a Firestore collection. The collection name will be
 
 	<teamName>@<sessionId>#<subsessionId>#<sessionNumber>
 	
-is used.
 
-Each collection contains an 'info' document containing the track name, team name,
-client version, max. session laps and max. session time. Depending on the event 
-type only one of the latter is relevant.
+Each collection maintains a 'state' document containing synchronization information to enable restarting
+the script during an ongoing event without information loss. 
 
-Each collection also maintains a 'state' document containing the stint number,
-stint laps, timestamps for pit lane entry/exit and start/stop of car movement,
-Towing and Repair times and the session id's. This information is used to 
-synchronize the teamtactics data among all team members.
-
-The telemetry data mentioned above is collected in one document per lap - so document
-'1' contains data for race lap 1.
+The telemetry data mentioned above is collected in one document per event - so document
+'1' contains data for event #1.
 
 
 ## Developer info
@@ -102,4 +71,4 @@ https://stackoverflow.com/questions/55848884/google-cloud-firestore-distribution
 
 Run
 
-    pyinstaller --clean -F teamtactics.py
+    pyinstaller --clean -F racecontrol.py
