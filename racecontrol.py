@@ -170,6 +170,8 @@ def checkSessionChange():
 def generateEvent(driver, driverIdx):
     trackEvent = {}
     state.eventCount += 1
+    trackEvent['Version'] = __version__
+    trackEvent['MessageType'] = 'event'
     trackEvent['SessionId'] = getCollectionName()
     trackEvent['IncNo'] = state.eventCount
     trackEvent['CurrentDriver'] = driver['UserName']
