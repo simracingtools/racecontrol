@@ -39,9 +39,7 @@ import os
 import time
 import json
 import logging
-from google.cloud import firestore
-from datetime import datetime
-from datetime import timedelta
+import requests
 
 # this is our State class, with some helpful variables
 class State:
@@ -73,6 +71,35 @@ class Field:
         dic['Teams'] = self.teams
         
         return dic
+
+class Connector:
+    postUrl = ''
+    headers = {'x-teamtactics-token': 'None'}
+    
+    def __init__(self, config):
+        print('Initializing connector')
+        if config.has_option('connect', 'postUrl'):
+            self.postUrl = str(config['connect']['postUrl'])
+    
+        if self.postUrl == '':
+            print('No Url configured, only logging events')
+        elif self.postUrl != '':
+            print('Using Url ' + self.postUrl + ' to publish events')
+            if config.has_option('connect', 'clientAccessToken'):
+                self.headers = { 'x-teamtactics-token': config['connect']['clientAccessToken'], 'Content-Type': 'application/json'}
+
+        if config.has_option('global', 'logfile'):
+            logging.basicConfig(filename=str(config['global']['logfile']),level=logging.INFO,format='%(asctime)s$%(message)s')
+
+    def publish(self, jsonData):
+        try:
+            logging.info(jsonData)
+            if self.postUrl != '':
+                response = requests.post(self.postUrl, data=jsonData, headers=self.headers, timeout=10.0)
+                return response
+
+        except Exception as ex:
+            print('Unable to publish data: ' + str(ex))
 
 # here we check if we are connected to iracing
 # so we can retrieve some data
@@ -117,13 +144,6 @@ def check_iracing():
                 field.teams = [None] * fieldsize
                 print('fieldsize: ' + str(fieldsize))
 
-            doc = db.collection(collectionName).document('State').get()
-            if doc.exists:
-                print('Sync state on connect change')
-                state.fromDict(doc.to_dict())
-            else:
-                print('No state in ' + collectionName)
-
 def getCollectionName():
 
     trackName = ir['WeekendInfo']['TrackName']
@@ -150,8 +170,11 @@ def checkSessionChange():
 def generateEvent(driver, driverIdx):
     trackEvent = {}
     state.eventCount += 1
+    trackEvent['SessionId'] = getCollectionName()
     trackEvent['IncNo'] = state.eventCount
     trackEvent['CurrentDriver'] = driver['UserName']
+    trackEvent['DriverId'] = driver['UserID']
+    trackEvent['TeamID'] = driver['TeamID']
     trackEvent['IRating'] = driver['IRating']
     trackEvent['TeamName'] = driver['TeamName']
     trackEvent['CarNumber'] = driver['CarNumberRaw']
@@ -175,7 +198,6 @@ def loop():
     state.lap = ir['LapCompleted']
 
     collectionName = getCollectionName()
-    col_ref = db.collection(collectionName)
     
     # check for pit enter/exit
     #checkPitRoad()
@@ -225,9 +247,9 @@ def loop():
                 print(json.dumps(trackEvent))
                 
                 try:
-                    col_ref.document(str(state.eventCount)).set(trackEvent)
+                    connector.publish(json.dumps(trackEvent))
                 except Exception as ex:
-                    print('Unable to write event document: ' + str(ex))
+                    print('Unable to publish event: ' + str(ex))
 
             if field.teams[driverIdx]['onPitRoad'] != dict['onPitRoad']:
                 trackEvent = generateEvent(driver, driverIdx)
@@ -241,9 +263,9 @@ def loop():
                 print(json.dumps(trackEvent))
                 
                 try:
-                    col_ref.document(str(state.eventCount)).set(trackEvent)
+                    connector.publish(json.dumps(trackEvent))
                 except Exception as ex:
-                    print('Unable to write event document: ' + str(ex))
+                    print('Unable to publish event: ' + str(ex))
 
             if field.teams[driverIdx]['trackLoc'] != dict['trackLoc']:
                 trackEvent = generateEvent(driver, driverIdx)
@@ -269,24 +291,15 @@ def loop():
                 if dict['trackLoc'] != -1 and trackEvent['Type'] != 'None':
                     print(json.dumps(trackEvent))
                     try:
-                        col_ref.document(str(state.eventCount)).set(trackEvent)
+                        connector.publish(json.dumps(trackEvent))
                     except Exception as ex:
-                        print('Unable to write event document: ' + str(ex))
+                        print('Unable to publish event: ' + str(ex))
 
         else:
             field.teams[driverIdx] = dict
             dataChanged = True
 
         position += 1
-
-        if dataChanged:
-            try:
-                col_ref.document('State').set(state.toDict())
-                #col_ref.document('Team' + str(dict['teamName'])).set(dict)
-                col_ref.document('Teams').set(field.toDict())
-            except Exception as ex:
-                print('Unable to write team data: ' + str(ex))
-
 
     else:
         checkSessionChange()
@@ -324,21 +337,12 @@ if __name__ == '__main__':
         os.environ['http_proxy'] = proxyUrl
         os.environ['https_proxy'] = proxyUrl
 
-    if config.has_option('global', 'firebase'):
-        os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = './' + str(config['global']['firebase'])
-        if debug:
-            print('Use Google Credential file ' + os.environ['GOOGLE_APPLICATION_CREDENTIALS'])
-
-        try:
-            db = firestore.Client()
-        except Exception as ex:
-            print('Unable to connect to Firebase: ' + str(ex))
-            sys.exit(1)
-
-    else:
-        print('option firebase not configured or irtactics.ini not found')
+    try:
+        connector = Connector(config)
+    except Exception as ex:
+        print('Unable to initialize Connector: ' + str(ex))
         sys.exit(1)
-        
+
     if config.has_option('global', 'logfile'):
         logging.basicConfig(filename=str(config['global']['logfile']),level=logging.INFO)
 
