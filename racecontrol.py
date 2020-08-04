@@ -179,13 +179,8 @@ def checkSessionChange():
 def generateEvent(driver, driverIdx):
     trackEvent = {}
     state.eventCount += 1
-    trackEvent['Version'] = __version__
-    trackEvent['MessageType'] = 'event'
-    trackEvent['SessionId'] = getCollectionName()
     trackEvent['IncNo'] = state.eventCount
     trackEvent['CurrentDriver'] = driver['UserName']
-    trackEvent['DriverId'] = driver['UserID']
-    trackEvent['TeamID'] = driver['TeamID']
     trackEvent['IRating'] = driver['IRating']
     trackEvent['TeamName'] = driver['TeamName']
     trackEvent['CarNumber'] = driver['CarNumberRaw']
@@ -196,14 +191,22 @@ def generateEvent(driver, driverIdx):
 
 def generateSessionEvent(ir):
     sessionEvent = {}
-    sessionEvent['Version'] = __version__
-    sessionEvent['MessageType'] = 'event'
-    sessionEvent['SessionId'] = getCollectionName()
     sessionEvent['TrackName'] = ir['WeekendInfo']['TrackDisplayName'] + ' - ' + ir['WeekendInfo']['TrackConfigName']
     sessionEvent['SessionDuration'] = ir['SessionInfo']['Sessions'][state.sessionNum]['SessionTime']
     sessionEvent['SessionType'] = ir['SessionInfo']['Sessions'][state.sessionNum]['SessionType']
     
     return sessionEvent
+
+def toMessage(driver, eventType, event):
+    _dict = {}
+    _dict['Version'] = __version__
+    _dict['Type'] = eventType
+    _dict['SessionId'] = getCollectionName()
+    _dict['ClientId'] = driver['UserID']
+    _dict['TeamId'] = driver['TeamID']
+    _dict['Payload'] = event
+
+    return _dict
 
 # our main loop, where we retrieve data
 # and do something useful with it
@@ -272,7 +275,7 @@ def loop():
                 print(json.dumps(trackEvent))
                 
                 try:
-                    connector.publish(json.dumps(trackEvent))
+                    connector.publish(json.dumps(toMessage(driver, 'event', trackEvent)))
                 except Exception as ex:
                     print('Unable to publish event: ' + str(ex))
 
@@ -288,7 +291,7 @@ def loop():
                 print(json.dumps(trackEvent))
                 
                 try:
-                    connector.publish(json.dumps(trackEvent))
+                    connector.publish(json.dumps(toMessage(driver, 'event', trackEvent)))
                 except Exception as ex:
                     print('Unable to publish event: ' + str(ex))
 
@@ -316,7 +319,7 @@ def loop():
                 if dict['trackLoc'] != -1 and trackEvent['Type'] != 'None':
                     print(json.dumps(trackEvent))
                     try:
-                        connector.publish(json.dumps(trackEvent))
+                        connector.publish(json.dumps(toMessage(ir['DriverInfo']['Drivers'][0], 'event', trackEvent)))
                     except Exception as ex:
                         print('Unable to publish event: ' + str(ex))
 
@@ -328,7 +331,7 @@ def loop():
 
     if checkSessionChange():
         try:
-            connector.publish(json.dumps(generateSessionEvent(ir)))
+            connector.publish(json.dumps(toMessage(driver, 'session', generateSessionEvent(ir))))
         except Exception as ex:
             print('Unable to publish event: ' + str(ex))
 
