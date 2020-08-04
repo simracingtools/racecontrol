@@ -194,6 +194,17 @@ def generateEvent(driver, driverIdx):
     
     return trackEvent
 
+def generateSessionEvent(ir):
+    sessionEvent = {}
+    sessionEvent['Version'] = __version__
+    sessionEvent['MessageType'] = 'event'
+    sessionEvent['SessionId'] = getCollectionName()
+    sessionEvent['TrackName'] = ir['WeekendInfo']['TrackDisplayName'] + ' - ' + ir['WeekendInfo']['TrackConfigName']
+    sessionEvent['SessionDuration'] = ir['SessionInfo']['Sessions'][state.sessionNum]['SessionTime']
+    sessionEvent['SessionType'] = ir['SessionInfo']['Sessions'][state.sessionNum]['SessionType']
+    
+    return sessionEvent
+
 # our main loop, where we retrieve data
 # and do something useful with it
 def loop():
@@ -315,8 +326,12 @@ def loop():
 
         position += 1
 
-    else:
-        checkSessionChange()
+    if checkSessionChange():
+        try:
+            connector.publish(json.dumps(generateSessionEvent(ir)))
+        except Exception as ex:
+            print('Unable to publish event: ' + str(ex))
+
 
 
 def banner():
