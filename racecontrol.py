@@ -139,10 +139,19 @@ def check_iracing():
 
             collectionName = getCollectionName()
             print(collectionName)
-            fieldsize = len(ir['DriverInfo']['Drivers'])
-            if len(field.teams) < fieldsize:
-                field.teams = [None] * fieldsize
-                print('fieldsize: ' + str(fieldsize))
+            resizeTeamField()
+
+def resizeTeamField():
+    fieldsize = len(ir['DriverInfo']['Drivers'])
+    __tmp = field.teams
+    if len(field.teams) < fieldsize:
+        field.teams = [None] * fieldsize
+        print('fieldsize: ' + str(fieldsize))
+        __idx = 0
+        while __idx < len(__tmp):
+            field.teams[__idx] = __tmp[__idx]
+            __idx += 1
+        print(str(__idx) + ' teams migrated')
 
 def getCollectionName():
 
@@ -209,6 +218,9 @@ def loop():
     if positions == None:
         return
     
+    if len(positions) > len(field.teams):
+        resizeTeamField()
+
     position = 0
     while position < len(positions):
         driverIdx = positions[position]['CarIdx']
