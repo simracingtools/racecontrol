@@ -136,9 +136,13 @@ def check_iracing():
             print('irsdk connected')
 
             checkSessionChange()
-
-            collectionName = getCollectionName()
-            print(collectionName)
+            try:
+                __msgStr = json.dumps(toMessage(ir['DriverInfo']['Drivers'][0], 'sessionInfo', generateSessionEvent(ir)))
+                connector.publish(__msgStr)
+                print(__msgStr)
+            except Exception as ex:
+                print('Unable to publish event: ' + str(ex))
+            
             resizeTeamField()
 
 def resizeTeamField():
@@ -331,7 +335,7 @@ def loop():
 
     if checkSessionChange():
         try:
-            connector.publish(json.dumps(toMessage(driver, 'session', generateSessionEvent(ir))))
+            connector.publish(json.dumps(toMessage(driver, 'sessionInfo', generateSessionEvent(ir))))
         except Exception as ex:
             print('Unable to publish event: ' + str(ex))
 
