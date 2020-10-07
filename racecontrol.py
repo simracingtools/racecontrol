@@ -241,7 +241,9 @@ def loop():
 
     position = 0
     while position < len(positions):
-        driverIdx = positions[position]['CarIdx']
+        driverIdx = positions[position]['CarIdx'] -1
+#        print(driverIdx)
+#        print(len(driverList))
         driver = driverList[driverIdx]
         dict = {}
 
@@ -323,7 +325,7 @@ def loop():
                 if dict['trackLoc'] != -1 and trackEvent['Type'] != 'None':
                     print(json.dumps(trackEvent))
                     try:
-                        connector.publish(json.dumps(toMessage(ir['DriverInfo']['Drivers'][0], 'event', trackEvent)))
+                        connector.publish(json.dumps(toMessage(driver, 'event', trackEvent)))
                     except Exception as ex:
                         print('Unable to publish event: ' + str(ex))
 
