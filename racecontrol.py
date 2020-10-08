@@ -114,6 +114,7 @@ def check_iracing():
         state.subSessionId = -1
         state.sessionNum = -1
         state.eventCount = 0
+        state.sessionState = 0
 
         # we are shut down ir library (clear all internal variables)
         ir.shutdown()
@@ -177,8 +178,14 @@ def checkSessionChange():
         state.sessionNum = ir['SessionNum']
         sessionChange = True
 
+    if state.sessonState != ir['SessionState']:
+        state.sessionState = ir['SessionState']
+        sessionChange = True
+
     if sessionChange:
         print('SessionId  : ' + getCollectionName())
+
+    return sessionChange
 
 def generateEvent(driver, driverIdx):
     trackEvent = {}
@@ -198,6 +205,7 @@ def generateSessionEvent(ir):
     sessionEvent['TrackName'] = ir['WeekendInfo']['TrackDisplayName'] + ' - ' + ir['WeekendInfo']['TrackConfigName']
     sessionEvent['SessionDuration'] = ir['SessionInfo']['Sessions'][state.sessionNum]['SessionTime']
     sessionEvent['SessionType'] = ir['SessionInfo']['Sessions'][state.sessionNum]['SessionType']
+    sessionEvent['SessionState'] = ir['SessionState']
     
     return sessionEvent
 
