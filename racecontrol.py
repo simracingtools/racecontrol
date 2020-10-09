@@ -50,6 +50,7 @@ class State:
     sessionId = -1
     subSessionId = -1
     sessionNum = -1
+    sessionState = 0
 
     def fromDict(self, dic):
         self.lap = dic['Lap']
@@ -178,7 +179,7 @@ def checkSessionChange():
         state.sessionNum = ir['SessionNum']
         sessionChange = True
 
-    if state.sessonState != ir['SessionState']:
+    if state.sessionState != ir['SessionState']:
         state.sessionState = ir['SessionState']
         sessionChange = True
 
@@ -206,6 +207,7 @@ def generateSessionEvent(ir):
     sessionEvent['SessionDuration'] = ir['SessionInfo']['Sessions'][state.sessionNum]['SessionTime']
     sessionEvent['SessionType'] = ir['SessionInfo']['Sessions'][state.sessionNum]['SessionType']
     sessionEvent['SessionState'] = ir['SessionState']
+    sessionEvent['SessionTime'] = ir['SessionTime'] / 86400
     
     return sessionEvent
 
@@ -326,6 +328,8 @@ def loop():
                     trackEvent['Type'] = 'AproachingPits'
                 elif dict['trackLoc'] == 3 and field.teams[driverIdx]['trackLoc'] != -1:
                     trackEvent['Type'] = 'OnTrack'
+                elif dict['trackLoc'] == 3 and state.sessionState == 1:
+                    trackEvent['Type'] = 'OnTrack'
                 else:
                     trackEvent['Type'] = 'None'
 
@@ -345,7 +349,9 @@ def loop():
 
     if checkSessionChange():
         try:
-            connector.publish(json.dumps(toMessage(driver, 'sessionInfo', generateSessionEvent(ir))))
+            sessionEvent = generateSessionEvent(ir)
+            print(json.dumps(sessionEvent))
+            connector.publish(json.dumps(toMessage(driver, 'sessionInfo', sessionEvent)))
         except Exception as ex:
             print('Unable to publish event: ' + str(ex))
 
