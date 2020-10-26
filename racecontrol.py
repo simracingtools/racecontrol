@@ -335,6 +335,28 @@ def loop():
         else:
             teams[teamId] = dict
             dataChanged = True
+            trackEvent = generateEvent(driver, driverIdx)
+            if dict['trackLoc'] == -1:
+                trackEvent['Type'] = 'OffWorld'
+            if dict['trackLoc'] == 0:
+                trackEvent['Type'] = 'OffTrack'
+            elif dict['trackLoc'] == 1:
+                trackEvent['Type'] = 'InPitStall'
+            elif dict['trackLoc'] == 2:
+                trackEvent['Type'] = 'AproachingPits'
+            elif dict['trackLoc'] == 3 and teams[teamId]['trackLoc'] != -1:
+                trackEvent['Type'] = 'OnTrack'
+            elif dict['trackLoc'] == 3 and state.sessionState == 1:
+                trackEvent['Type'] = 'OnTrack'
+            else:
+                trackEvent['Type'] = 'None'
+
+            print(json.dumps(trackEvent))
+            try:
+                connector.publish(json.dumps(toMessage(driver, 'event', trackEvent)))
+            except Exception as ex:
+                print('Unable to publish event: ' + str(ex))
+
 
         position += 1
 
