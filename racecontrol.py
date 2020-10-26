@@ -64,15 +64,6 @@ class State:
         dic['EventCount'] = self.eventCount
         return dic
 
-class Field:
-    teams = []
-
-    def toDict(self):
-        dic = {}
-        dic['Teams'] = self.teams
-        
-        return dic
-
 class Connector:
     postUrl = ''
     headers = {'x-teamtactics-token': 'None'}
@@ -143,22 +134,8 @@ def check_iracing():
                 connector.publish(__msgStr)
                 print(__msgStr)
             except Exception as ex:
-                print('Unable to publish event: ' + str(ex))
+                print('Unable to publish initial session: ' + str(ex))
             
-            resizeTeamField()
-
-def resizeTeamField():
-    fieldsize = len(ir['DriverInfo']['Drivers'])
-    __tmp = field.teams
-    if len(field.teams) < fieldsize:
-        field.teams = [None] * fieldsize
-        print('fieldsize: ' + str(fieldsize))
-        __idx = 0
-        while __idx < len(__tmp):
-            field.teams[__idx] = __tmp[__idx]
-            __idx += 1
-        print(str(__idx) + ' teams migrated')
-
 def getCollectionName():
 
     trackName = ir['WeekendInfo']['TrackName']
@@ -195,20 +172,27 @@ def generateEvent(driver, driverIdx):
     trackEvent['CurrentDriver'] = driver['UserName']
     trackEvent['IRating'] = driver['IRating']
     trackEvent['TeamName'] = driver['TeamName']
-    trackEvent['CarNumber'] = driver['CarNumberRaw']
-    trackEvent['Lap'] = ir['CarIdxLap'][driverIdx]
+    trackEvent['CarNumber'] = driver['CarNumber']
+    trackEvent['CarName'] = driver['CarScreenName']
+    trackEvent['CarClass'] = driver['CarClassShortName']
+    trackEvent['CarClassId'] = driver['CarClassID']
+    trackEvent['CarClassColor'] = driver['CarClassColor']
+    trackEvent['CarLap'] = ir['CarIdxLap'][driverIdx]
+    trackEvent['LapPct'] = ir['CarIdxLapDistPct'][driverIdx]
     trackEvent['SessionTime'] = ir['SessionTime'] / 86400
     
     return trackEvent
 
 def generateSessionEvent(ir):
     sessionEvent = {}
-    sessionEvent['TrackName'] = ir['WeekendInfo']['TrackDisplayName'] + ' - ' + ir['WeekendInfo']['TrackConfigName']
+    sessionEvent['TrackName'] = ir['WeekendInfo']['TrackDisplayName']
+    if ir['WeekendInfo']['TrackConfigName']:
+        sessionEvent['TrackName'] += ' - ' + ir['WeekendInfo']['TrackConfigName']
     sessionEvent['SessionDuration'] = ir['SessionInfo']['Sessions'][state.sessionNum]['SessionTime']
     sessionEvent['SessionType'] = ir['SessionInfo']['Sessions'][state.sessionNum]['SessionType']
     sessionEvent['SessionState'] = ir['SessionState']
     sessionEvent['SessionTime'] = ir['SessionTime'] / 86400
-    
+
     return sessionEvent
 
 def toMessage(driver, eventType, event):
@@ -218,6 +202,7 @@ def toMessage(driver, eventType, event):
     _dict['SessionId'] = getCollectionName()
     _dict['ClientId'] = driver['UserID']
     _dict['TeamId'] = driver['TeamID']
+    _dict['Lap'] = state.lap
     _dict['Payload'] = event
 
     return _dict
@@ -234,8 +219,6 @@ def loop():
     ir.freeze_var_buffer_latest()
 
     state.tick += 1
-    state.lap = ir['LapCompleted']
-
     collectionName = getCollectionName()
     
     # check for pit enter/exit
@@ -243,18 +226,26 @@ def loop():
 
     driverList = ir['DriverInfo']['Drivers']
     positions = ir['SessionInfo']['Sessions'][state.sessionNum]['ResultsPositions']
+    state.lap = ir['SessionInfo']['Sessions'][state.sessionNum]['ResultsLapsComplete']
+
     if positions == None:
         return
     
-    if len(positions) > len(field.teams):
-        resizeTeamField()
-
     position = 0
     while position < len(positions):
         driverIdx = positions[position]['CarIdx'] -1
 #        print(driverIdx)
 #        print(len(driverList))
-        driver = driverList[driverIdx]
+        try:
+            driver = driverList[driverIdx]
+        except IndexError:
+            print('Driver index ' + str(driverIdx) + ' is invalid')
+            continue
+
+        teamId = driver['TeamID']
+        if teamId < 1 and driver['UserID'] > 0:
+            teamId = driver['UserID']
+
         dict = {}
 
         dict['teamName'] = driver['TeamName']
@@ -270,23 +261,23 @@ def loop():
 
         dataChanged = False
         
-        if field.teams[driverIdx]:
-            field.teams[driverIdx]['teamName'] = driver['TeamName']
-            field.teams[driverIdx]['overallPosition'] = position
-            field.teams[driverIdx]['CarNumber'] = driver['CarNumberRaw']
-            field.teams[driverIdx]['classPosition'] = positions[position]['ClassPosition']
-            field.teams[driverIdx]['lap'] = ir['CarIdxLap'][driverIdx]
-            field.teams[driverIdx]['SessionTime'] = ir['SessionTime'] / 86400
-            if field.teams[driverIdx]['lastLapTime'] != dict['lastLapTime']:
-                field.teams[driverIdx]['lastLapTime'] = positions[position]['LastTime'] / 86400
+        if teamId in teams:
+            teams[teamId]['teamName'] = driver['TeamName']
+            teams[teamId]['overallPosition'] = position
+            teams[teamId]['CarNumber'] = driver['CarNumberRaw']
+            teams[teamId]['classPosition'] = positions[position]['ClassPosition']
+            teams[teamId]['lap'] = ir['CarIdxLap'][driverIdx]
+            teams[teamId]['SessionTime'] = ir['SessionTime'] / 86400
+            if teams[teamId]['lastLapTime'] != dict['lastLapTime']:
+                teams[teamId]['lastLapTime'] = positions[position]['LastTime'] / 86400
                 dataChanged = True
 
-            if field.teams[driverIdx]['currentDriver'] != driver['UserName']: 
+            if teams[teamId]['currentDriver'] != driver['UserName']: 
             #and dict['trackLoc'] == 3:
                 trackEvent = generateEvent(driver, driverIdx)
                 trackEvent['Type'] = 'DriverChange'
 
-                field.teams[driverIdx]['currentDriver'] = driver['UserName']
+                teams[teamId]['currentDriver'] = driver['UserName']
                 
                 print(json.dumps(trackEvent))
                 
@@ -295,23 +286,23 @@ def loop():
                 except Exception as ex:
                     print('Unable to publish event: ' + str(ex))
 
-            if field.teams[driverIdx]['onPitRoad'] != dict['onPitRoad']:
+            if teams[teamId]['onPitRoad'] != dict['onPitRoad']:
                 trackEvent = generateEvent(driver, driverIdx)
                 if dict['onPitRoad']:
                     trackEvent['Type'] = 'PitEnter'
                 else:
                     trackEvent['Type'] = 'PitExit'
 
-                field.teams[driverIdx]['onPitRoad'] = dict['onPitRoad']
+                teams[teamId]['onPitRoad'] = dict['onPitRoad']
 
                 print(json.dumps(trackEvent))
                 
                 try:
                     connector.publish(json.dumps(toMessage(driver, 'event', trackEvent)))
                 except Exception as ex:
-                    print('Unable to publish event: ' + str(ex))
+                    print('Unable to publish session: ' + str(ex))
 
-            if field.teams[driverIdx]['trackLoc'] != dict['trackLoc']:
+            if teams[teamId]['trackLoc'] != dict['trackLoc']:
                 trackEvent = generateEvent(driver, driverIdx)
                 #irsdk_NotInWorld       -1
                 #irsdk_OffTrack          0
@@ -326,14 +317,14 @@ def loop():
                     trackEvent['Type'] = 'InPitStall'
                 elif dict['trackLoc'] == 2:
                     trackEvent['Type'] = 'AproachingPits'
-                elif dict['trackLoc'] == 3 and field.teams[driverIdx]['trackLoc'] != -1:
+                elif dict['trackLoc'] == 3 and teams[teamId]['trackLoc'] != -1:
                     trackEvent['Type'] = 'OnTrack'
                 elif dict['trackLoc'] == 3 and state.sessionState == 1:
                     trackEvent['Type'] = 'OnTrack'
                 else:
                     trackEvent['Type'] = 'None'
 
-                field.teams[driverIdx]['trackLoc'] = dict['trackLoc']
+                teams[teamId]['trackLoc'] = dict['trackLoc']
                 if dict['trackLoc'] != -1 and trackEvent['Type'] != 'None':
                     print(json.dumps(trackEvent))
                     try:
@@ -342,7 +333,7 @@ def loop():
                         print('Unable to publish event: ' + str(ex))
 
         else:
-            field.teams[driverIdx] = dict
+            teams[teamId] = dict
             dataChanged = True
 
         position += 1
@@ -351,7 +342,7 @@ def loop():
         try:
             sessionEvent = generateSessionEvent(ir)
             print(json.dumps(sessionEvent))
-            connector.publish(json.dumps(toMessage(driver, 'sessionInfo', sessionEvent)))
+            connector.publish(json.dumps(toMessage(ir['DriverInfo']['Drivers'][0], 'sessionInfo', sessionEvent)))
         except Exception as ex:
             print('Unable to publish event: ' + str(ex))
 
@@ -401,7 +392,7 @@ if __name__ == '__main__':
     # initializing ir and state
     ir = irsdk.IRSDK()
     state = State()
-    field = Field()
+    teams = {}
     # Project ID is determined by the GCLOUD_PROJECT environment variable
 
     try:
