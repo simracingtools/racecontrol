@@ -30,7 +30,7 @@ __email__ =  "rbausdorf@gmail.com"
 __license__ = "GPLv3"
 #__maintainer__ = "developer"
 __status__ = "Beta"
-__version__ = "0.90"
+__version__ = "1.00"
 
 import sys
 import configparser
@@ -77,8 +77,8 @@ class Connector:
             print('No Url configured, only logging events')
         elif self.postUrl != '':
             print('Using Url ' + self.postUrl + ' to publish events')
-            if config.has_option('connect', 'clientAccessToken'):
-                self.headers = { 'x-teamtactics-token': config['connect']['clientAccessToken'], 'Content-Type': 'application/json'}
+#            if config.has_option('connect', 'clientAccessToken'):
+            self.headers = {'Content-Type': 'application/json'}
 
         if config.has_option('global', 'logfile'):
             logging.basicConfig(filename=str(config['global']['logfile']),level=logging.INFO,format='%(asctime)s$%(message)s')
@@ -197,13 +197,13 @@ def generateSessionEvent(ir):
 
 def toMessage(driver, eventType, event):
     _dict = {}
-    _dict['Version'] = __version__
-    _dict['Type'] = eventType
-    _dict['SessionId'] = getCollectionName()
-    _dict['ClientId'] = driver['UserID']
-    _dict['TeamId'] = driver['TeamID']
-    _dict['Lap'] = state.lap
-    _dict['Payload'] = event
+    _dict['version'] = __version__
+    _dict['type'] = eventType
+    _dict['sessionId'] = getCollectionName()
+    _dict['clientId'] = driver['UserID']
+    _dict['teamId'] = driver['TeamID']
+    _dict['lap'] = state.lap
+    _dict['payload'] = event
 
     return _dict
 
@@ -351,11 +351,12 @@ def loop():
             else:
                 trackEvent['Type'] = 'None'
 
-            print(json.dumps(trackEvent))
-            try:
-                connector.publish(json.dumps(toMessage(driver, 'event', trackEvent)))
-            except Exception as ex:
-                print('Unable to publish event: ' + str(ex))
+            if dict['trackLoc'] != -1 and trackEvent['Type'] != 'None':
+                print(json.dumps(trackEvent))
+                try:
+                    connector.publish(json.dumps(toMessage(driver, 'event', trackEvent)))
+                except Exception as ex:
+                    print('Unable to publish event: ' + str(ex))
 
 
         position += 1
