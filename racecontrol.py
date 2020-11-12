@@ -85,6 +85,8 @@ class Connector:
 
     def publish(self, jsonData):
         try:
+            jsonData = jsonData.replace('\\u00fc', 'ü').replace('\\u00f6', 'ö').replace('\\u00e4', 'ä').replace('\\00df', 'ß')
+            jsonData = jsonData.replace('\\u00dc', 'Ü').replace('\\u00d6', 'Ö').replace('\\u00c4', 'Ä').encode('utf-8')
             logging.info(jsonData)
             if self.postUrl != '':
                 response = requests.post(self.postUrl, data=jsonData, headers=self.headers, timeout=10.0)
@@ -207,6 +209,25 @@ def toMessage(driver, eventType, event):
 
     return _dict
 
+def getPositionData(carIdx, positions):
+    if not positions:
+        return
+
+    position = 0
+    _dict = {}
+    while position < len(positions):
+        if positions[position]['CarIdx'] == carIdx:
+            _dict['overallPosition'] = positions[position]['Position']
+            _dict['classPosition'] = positions[position]['ClassPosition']
+            _dict['lapsComplete'] = positions[position]['LapsComplete']
+            _dict['lastLapTime'] = positions[position]['LastTime'] / 86400
+            return _dict
+
+        position += 1
+
+    return None
+
+
 # our main loop, where we retrieve data
 # and do something useful with it
 def loop():
@@ -217,7 +238,7 @@ def loop():
     # another one in next line of code can be changed
     # to the next iracing internal tick_count
     ir.freeze_var_buffer_latest()
-
+#    print(("enter loop"))
     state.tick += 1
     collectionName = getCollectionName()
     
@@ -225,24 +246,23 @@ def loop():
     #checkPitRoad()
 
     driverList = ir['DriverInfo']['Drivers']
-    positions = ir['SessionInfo']['Sessions'][state.sessionNum]['ResultsPositions']
     state.lap = ir['SessionInfo']['Sessions'][state.sessionNum]['ResultsLapsComplete']
+    positions = ir['SessionInfo']['Sessions'][state.sessionNum]['ResultsPositions']
 
-    if positions == None:
-        return
-    
     position = 0
-    while position < len(positions):
-        driverIdx = positions[position]['CarIdx'] -1
+    while position < len(driverList):
+        driverIdx = driverList[position]['CarIdx']
 #        print(driverIdx)
 #        print(len(driverList))
         try:
             driver = driverList[driverIdx]
         except IndexError:
-            print('Driver index ' + str(driverIdx) + ' is invalid')
+            position += 1
+#            print('Driver index ' + str(driverIdx) + ' is invalid')
             continue
 
         teamId = driver['TeamID']
+#        print("team id: " + str(teamId))
         if teamId < 1 and driver['UserID'] > 0:
             teamId = driver['UserID']
 
@@ -250,27 +270,34 @@ def loop():
 
         dict['teamName'] = driver['TeamName']
         dict['currentDriver'] = driver['UserName']
-        dict['overallPosition'] = position
-        dict['classPosition'] = positions[position]['ClassPosition']
-        dict['lapsComplete'] = positions[position]['LapsComplete']
-        dict['lastLapTime'] = positions[position]['LastTime'] / 86400
         dict['SessionTime'] = ir['SessionTime'] / 86400
-
         dict['onPitRoad'] = ir['CarIdxOnPitRoad'][driverIdx]
         dict['trackLoc'] = ir['CarIdxTrackSurface'][driverIdx]
 
-        dataChanged = False
-        
+#        print(str(dict))
+        posData = getPositionData(driverIdx, positions)
+        if posData:
+            dict['overallPosition'] = posData['overallPosition']
+            dict['classPosition'] = posData['classPosition']
+            dict['lapsComplete'] = posData['lapsComplete']
+            dict['lastLapTime'] = posData['lastLapTime']
+
+#        print("Posdata: " + str(posData))
+
         if teamId in teams:
+#            print("known team id")
             teams[teamId]['teamName'] = driver['TeamName']
-            teams[teamId]['overallPosition'] = position
             teams[teamId]['CarNumber'] = driver['CarNumberRaw']
-            teams[teamId]['classPosition'] = positions[position]['ClassPosition']
             teams[teamId]['lap'] = ir['CarIdxLap'][driverIdx]
             teams[teamId]['SessionTime'] = ir['SessionTime'] / 86400
-            if teams[teamId]['lastLapTime'] != dict['lastLapTime']:
-                teams[teamId]['lastLapTime'] = positions[position]['LastTime'] / 86400
-                dataChanged = True
+            if posData:
+                teams[teamId]['overallPosition'] = posData['overallPosition']
+                teams[teamId]['classPosition'] = posData['classPosition']
+                try:               
+                    if teams[teamId]['lastLapTime'] != posData['lastLapTime']:
+                        teams[teamId]['lastLapTime'] = posData['lastLapTime']
+                except KeyError:
+                    teams[teamId]['lastLapTime'] = posData['lastLapTime']
 
             if teams[teamId]['currentDriver'] != driver['UserName']: 
             #and dict['trackLoc'] == 3:
@@ -333,6 +360,7 @@ def loop():
                         print('Unable to publish event: ' + str(ex))
 
         else:
+#            print("new team: " + str(dict))
             teams[teamId] = dict
             dataChanged = True
             trackEvent = generateEvent(driver, driverIdx)
@@ -360,7 +388,8 @@ def loop():
 
 
         position += 1
-
+        
+#    print("after while")
     if checkSessionChange():
         try:
             sessionEvent = generateSessionEvent(ir)
