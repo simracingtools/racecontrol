@@ -24,11 +24,6 @@ recorded along with a timestamp:
 	[DEFAULT]
 	
 	[global]
-	# Firebase access credentials. This file has to be provided
-	# by the Google Firestore owner. It has to placed in the same
-	# directory as teamtactics.exe
-	firebase = <firestoreCedentials.json>
-
 	# Proxy configuration. The given URL will be used as Proxy on both http and 
 	# https protocol
 	;proxy = <Proxy URL>
@@ -38,12 +33,18 @@ recorded along with a timestamp:
 	;debug = yes
 
 	# Logfile to which data is written in debug mode 
-	logfile = irtactics.log
+	logfile = racecontrol.log
 
 	# Uncomment to start the application using a data dump file from irsdk for 
 	# testing/development purposes. The dump file can be created by issuing the 
 	# command 'irsdk --dump data.dmp'
 	;simulate = data/monzasunset.dump
+
+	[connect]
+	# URL to which all events are posted as json data. 
+	# If postUrl value is empty data is only written to the logfile.
+	postUrl = http://localhost:8080/clientmessage
+
 
 To start a session recording:
 
@@ -51,23 +52,11 @@ To start a session recording:
 	
 ## Data collections
 
-All session data is gathered within a Firestore collection. The collection name will be
-
-	<teamName>@<sessionId>#<subsessionId>#<sessionNumber>
-	
-
-Each collection maintains a 'state' document containing synchronization information to enable restarting
-the script during an ongoing event without information loss. 
-
-The telemetry data mentioned above is collected in one document per event - so document
-'1' contains data for event #1.
+All session data is intended to be sent to an instance of a [racecontrol-server](https://github.com/simracingtools/racecontrol-server). 
 
 
 ## Developer info
 ### Build
-
-Follow instructions at 
-https://stackoverflow.com/questions/55848884/google-cloud-firestore-distribution-doesnt-get-added-to-pyinstaller-build
 
 Run
 
