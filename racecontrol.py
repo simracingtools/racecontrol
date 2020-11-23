@@ -26,7 +26,7 @@ __deprecated__ = False
 __email__ = "rbausdorf@gmail.com"
 __license__ = "GPLv3"
 __status__ = "Beta"
-__version__ = "1.01"
+__version__ = "1.0.2"
 
 import configparser
 import json
