@@ -21,7 +21,7 @@ jobs:
         pip install -r requirements.txt
     - name: Build pyinstaller
       run: |
-        pyinstaller --clean --noconsole -F racecontrol.py
+        pyinstaller --clean -F racecontrol.py
 #    - name: Compile setup
 #      run: |
 #        iscc.exe irrcapp.iss
