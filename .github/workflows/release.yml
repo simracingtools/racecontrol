@@ -1,0 +1,47 @@
+name: Release race control feeder
+
+on:
+  workflow_dispatch
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Bump version and push tag
+      id: create_tag
+      uses: mathieudutour/github-tag-action@v4.6
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+    - name: Set up Python
+      uses: actions/setup-python@v2
+    - name: Install dependencies
+      run: |
+        pip install -r requirements.txt
+    - name: Build pyinstaller
+      run: |
+        pyinstaller --clean --noconsole -F racecontrol.py
+#    - name: Compile setup
+#      run: |
+#        iscc.exe irrcapp.iss
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ steps.create_tag.outputs.new_tag }}
+        release_name: Release ${{ steps.create_tag.outputs.new_tag }}
+        draft: false
+        prerelease: false
+    - name: Upload Release Asset
+      id: upload-release-asset 
+      uses: actions/upload-release-asset@v1
+      env:
+       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
+        asset_path: ./dist/racecontrol.exe
+        asset_name: racecontrol.exe
+        asset_content_type: application/vnd.microsoft.portable-executable

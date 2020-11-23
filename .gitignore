@@ -4,6 +4,6 @@ __pycache__/
 /build/
 /*.spec
 racecontrol.ini
-*.txt
 /racecontrol.iml
 dist/racecontrol.exe
+/data/*.txt
