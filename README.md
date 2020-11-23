@@ -56,6 +56,12 @@ All session data is intended to be sent to an instance of a [racecontrol-server]
 
 
 ## Developer info
+
+### Requirements
+
+To install all required packages, run
+
+	pip install -r requirements.txt
 ### Build
 
 Run
