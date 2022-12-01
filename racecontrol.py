@@ -26,7 +26,7 @@ __deprecated__ = False
 __email__ = "rbausdorf@gmail.com"
 __license__ = "GPLv3"
 __status__ = "Beta"
-__version__ = "1.0.2"
+__version__ = "1.1.0"
 
 import configparser
 import json
@@ -114,8 +114,8 @@ def get_collection_name():
     track_name = ir['WeekendInfo']['TrackName']
     return str(
         track_name) + '@' + str(state.session_id) \
-                    + '#' + str(state.sub_session_id) \
-                    + '#' + str(state.session_num)
+           + '#' + str(state.sub_session_id) \
+           + '#' + str(state.session_num)
 
 
 def check_session_change():
@@ -240,6 +240,52 @@ def get_position_data(car_idx, positions):
     return None
 
 
+def send_pit_event(team_id, driver, driver_idx, _dict):
+    track_event = generate_event(driver, driver_idx)
+    if _dict['onPitRoad']:
+        track_event['Type'] = 'PitEnter'
+    else:
+        track_event['Type'] = 'PitExit'
+
+    teams[team_id]['onPitRoad'] = _dict['onPitRoad']
+
+    print(json.dumps(track_event))
+
+    try:
+        connector.publish(
+            json.dumps(to_message(driver, 'event', track_event)))
+    except Exception as send_exception:
+        print('Unable to publish session: ' + str(send_exception))
+
+
+def send_driver_change(team_id, driver, driver_idx):
+    track_event = generate_event(driver, driver_idx)
+    track_event['Type'] = 'DriverChange'
+
+    teams[team_id]['currentDriver'] = driver['UserName']
+
+    print(json.dumps(track_event))
+
+    try:
+        connector.publish(
+            json.dumps(to_message(driver, 'event', track_event)))
+    except Exception as send_exception:
+        print(UNABLE_TO_PUBLISH_EVENT + str(send_exception))
+
+
+def send_lap_change(driver, driver_idx):
+    track_event = generate_event(driver, driver_idx)
+    track_event['Type'] = 'Lap'
+
+    print(json.dumps(track_event))
+
+    try:
+        connector.publish(
+            json.dumps(to_message(driver, 'event', track_event)))
+    except Exception as send_exception:
+        print(UNABLE_TO_PUBLISH_EVENT + str(send_exception))
+
+
 # our main loop, where we retrieve data
 # and do something useful with it
 def loop():
@@ -296,7 +342,6 @@ def loop():
             #            print("known team id")
             teams[team_id]['teamName'] = driver['TeamName']
             teams[team_id]['CarNumber'] = driver['CarNumberRaw']
-            teams[team_id]['lap'] = ir['CarIdxLap'][driver_idx]
             teams[team_id]['SessionTime'] = ir['SessionTime'] / 86400
             if pos_data:
                 teams[team_id]['overallPosition'] = pos_data['overallPosition']
@@ -308,36 +353,14 @@ def loop():
                     teams[team_id]['lastLapTime'] = pos_data['lastLapTime']
 
             if teams[team_id]['currentDriver'] != driver['UserName']:
-                # and dict['trackLoc'] == 3:
-                track_event = generate_event(driver, driver_idx)
-                track_event['Type'] = 'DriverChange'
+                send_driver_change(team_id, driver, driver_idx)
 
-                teams[team_id]['currentDriver'] = driver['UserName']
-
-                print(json.dumps(track_event))
-
-                try:
-                    connector.publish(
-                        json.dumps(to_message(driver, 'event', track_event)))
-                except Exception as send_exception:
-                    print(UNABLE_TO_PUBLISH_EVENT + str(send_exception))
+            if teams[team_id]['Lap'] != ir['CarIdxLap'][driver_idx]:
+                teams[team_id]['lap'] = ir['CarIdxLap'][driver_idx]
+                send_lap_change(driver, driver_idx)
 
             if teams[team_id]['onPitRoad'] != _dict['onPitRoad']:
-                track_event = generate_event(driver, driver_idx)
-                if _dict['onPitRoad']:
-                    track_event['Type'] = 'PitEnter'
-                else:
-                    track_event['Type'] = 'PitExit'
-
-                teams[team_id]['onPitRoad'] = _dict['onPitRoad']
-
-                print(json.dumps(track_event))
-
-                try:
-                    connector.publish(
-                        json.dumps(to_message(driver, 'event', track_event)))
-                except Exception as send_exception:
-                    print('Unable to publish session: ' + str(send_exception))
+                send_pit_event(team_id, driver, driver_idx, _dict)
 
             if teams[team_id]['trackLoc'] != _dict['trackLoc']:
                 teams[team_id]['trackLoc'] = _dict['trackLoc']
