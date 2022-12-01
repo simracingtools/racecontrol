@@ -3,7 +3,10 @@
 __pycache__/
 /build/
 /*.spec
-racecontrol.ini
+/racecontrol.ini
 /racecontrol.iml
-dist/racecontrol.exe
+dist/*.exe
+dist/*.zip
 /data/*.txt
+/data/*.yaml
+/.idea/
