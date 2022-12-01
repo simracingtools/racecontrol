@@ -355,7 +355,8 @@ def loop():
             if teams[team_id]['currentDriver'] != driver['UserName']:
                 send_driver_change(team_id, driver, driver_idx)
 
-            if teams[team_id]['Lap'] != ir['CarIdxLap'][driver_idx]:
+            if teams[team_id]['LapPct'] > ir['CarIdxLap'][driver_idx]:
+                teams[team_id]['LapPct'] = ir['CarIdxLapDistPct'][driver_idx]
                 teams[team_id]['lap'] = ir['CarIdxLap'][driver_idx]
                 send_lap_change(driver, driver_idx)
 
