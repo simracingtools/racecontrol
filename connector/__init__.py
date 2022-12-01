@@ -32,6 +32,7 @@ class Connector:
                 .replace('\\00df', 'ß')\
                 .replace('\\u00dc', 'Ü')\
                 .replace('\\u00d6', 'Ö')\
+                .replace('\\u00ed', 'í')\
                 .replace('\\u00c4', 'Ä').encode('utf-8')
 
             logging.info(json_data)
