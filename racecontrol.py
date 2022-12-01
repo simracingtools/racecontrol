@@ -365,7 +365,7 @@ def loop():
 def banner():
     print("=============================")
     print("|   iRacing Race Control    |")
-    print("|           " + str(__version__) + "            |")
+    print("|           " + str(__version__) + "           |")
     print("=============================")
 
 
