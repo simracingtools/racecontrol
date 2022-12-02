@@ -20,7 +20,7 @@ this program. If not, see <http://www.gnu.org/licenses/>.
 
 __author__ = "Robert Bausdorf"
 __contact__ = "rbausdorf@gmail.com"
-__copyright__ = "2019, bausdorf engineering"
+__copyright__ = "2019-2022, bausdorf engineering"
 __date__ = "2019/06/01"
 __deprecated__ = False
 __email__ = "rbausdorf@gmail.com"
@@ -218,6 +218,9 @@ def to_message(driver, event_type, event):
              'lap': state.lap,
              'payload': event}
 
+    if _dict['teamId'] == 0:
+        _dict['teamId'] = driver['UserID']
+
     return _dict
 
 
@@ -355,10 +358,15 @@ def loop():
             if teams[team_id]['currentDriver'] != driver['UserName']:
                 send_driver_change(team_id, driver, driver_idx)
 
-            if teams[team_id]['LapPct'] > ir['CarIdxLap'][driver_idx]:
-                teams[team_id]['LapPct'] = ir['CarIdxLapDistPct'][driver_idx]
-                teams[team_id]['lap'] = ir['CarIdxLap'][driver_idx]
+            if teams[team_id]['LapPct'] > ir['CarIdxLapDistPct'][driver_idx] \
+                    and _dict['trackLoc'] == 3 \
+                    and ir['CarIdxLap'][driver_idx] > teams[team_id]['Lap']:
+                #   print("Lap(" + str(team_id) + ") " + str(teams[team_id]['Lap']) + ", " + str(ir['CarIdxLap'][driver_idx]))
+                #   print("LapPct(" + str(team_id) + ") " + str(teams[team_id]['LapPct']) + ", " + str(ir['CarIdxLapDistPct'][driver_idx]))
                 send_lap_change(driver, driver_idx)
+
+            teams[team_id]['Lap'] = ir['CarIdxLap'][driver_idx]
+            teams[team_id]['LapPct'] = ir['CarIdxLapDistPct'][driver_idx]
 
             if teams[team_id]['onPitRoad'] != _dict['onPitRoad']:
                 send_pit_event(team_id, driver, driver_idx, _dict)
@@ -369,8 +377,11 @@ def loop():
 
         else:
             #            print("new team: " + str(dict))
-            teams[team_id] = _dict
-            send_track_event(_dict, driver_idx, driver, team_id)
+            if team_id > 0:
+                _dict['LapPct'] = ir['CarIdxLapDistPct'][driver_idx]
+                _dict['Lap'] = ir['CarIdxLap'][driver_idx]
+                teams[team_id] = _dict
+                send_track_event(_dict, driver_idx, driver, team_id)
 
         position += 1
 
