@@ -18,6 +18,7 @@ recorded along with a timestamp:
 * In pit stalls
 * Driver change
 * Exit pitlane
+* Crossing start/finish line ON_TRACK (Lap completed) 
 
 ## Configuration and usage
 
@@ -62,7 +63,8 @@ All session data is intended to be sent to an instance of a [racecontrol-server]
 To install all required packages, run
 
 	pip install -r requirements.txt
-### Build
+
+### Build Self-Contained executable
 
 Run
 
