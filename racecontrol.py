@@ -34,6 +34,7 @@ import logging
 import os
 import sys
 import time
+import pickle
 
 import irsdk
 from connector import Connector
@@ -63,7 +64,7 @@ def to_dict(self):
     return _dic
 
 
-# here we check if we are connected to iracing
+# here we check if we are connected to iracing,
 # so we can retrieve some data
 def check_iracing():
     if state.ir_connected and not (ir.is_initialized and ir.is_connected):
@@ -99,15 +100,8 @@ def check_iracing():
             print('irsdk connected')
 
             check_session_change()
-            try:
-                __msg_str = json.dumps(
-                    to_message(ir['DriverInfo']['Drivers'][0], 'sessionInfo',
-                               generate_session_event()))
-                connector.publish(__msg_str)
-                print(__msg_str)
-            except Exception as send_exception:
-                print('Unable to publish initial session: '
-                      + str(send_exception))
+            read_session_event_count()
+            publish_for_event_no(to_message(ir['DriverInfo']['Drivers'][0], 'sessionInfo', generate_session_event()))
 
 
 def get_collection_name():
@@ -143,6 +137,16 @@ def check_session_change():
     return session_change
 
 
+def read_session_event_count():
+    try:
+        f = open(get_collection_name(), "rb")
+        state.event_count = pickle.load(f)
+        print("Event count for session: " + str(state.event_count))
+        f.close()
+    except Exception as fileException:
+        print(str(fileException))
+
+
 def generate_event(driver, driver_idx):
     track_event = {}
     state.event_count += 1
@@ -158,6 +162,8 @@ def generate_event(driver, driver_idx):
     track_event['CarLap'] = ir['CarIdxLap'][driver_idx]
     track_event['LapPct'] = ir['CarIdxLapDistPct'][driver_idx]
     track_event['SessionTime'] = ir['SessionTime'] / 86400
+
+    pickle.dump(state.event_count, open(get_collection_name(), "wb"))
 
     return track_event
 
@@ -186,11 +192,7 @@ def send_track_event(_dict, driver_idx, driver, team_id):
 
     if _dict['trackLoc'] != -1 and track_event['Type'] != 'None':
         print(json.dumps(track_event))
-        try:
-            connector.publish(
-                json.dumps(to_message(driver, 'event', track_event)))
-        except Exception as send_exception:
-            print(UNABLE_TO_PUBLISH_EVENT + str(send_exception))
+        publish_for_event_no(to_message(driver, 'event', track_event))
 
 
 def generate_session_event():
@@ -207,6 +209,22 @@ def generate_session_event():
     session_event['SessionTime'] = ir['SessionTime'] / 86400
 
     return session_event
+
+
+def publish_for_event_no(event_message):
+    try:
+        _event_no = connector.publish(json.dumps(event_message))
+        try:
+            _event_count = int(_event_no)
+            if _event_count > -1:
+                state.event_count = _event_count
+            else:
+                print("Event count -1 (invalid)")
+        except ValueError as vr:
+            print("Server returned: " + str(vr))
+
+    except Exception as send_exception:
+        print(UNABLE_TO_PUBLISH_EVENT + str(send_exception))
 
 
 def to_message(driver, event_type, event):
@@ -254,11 +272,7 @@ def send_pit_event(team_id, driver, driver_idx, _dict):
 
     print(json.dumps(track_event))
 
-    try:
-        connector.publish(
-            json.dumps(to_message(driver, 'event', track_event)))
-    except Exception as send_exception:
-        print('Unable to publish session: ' + str(send_exception))
+    publish_for_event_no(to_message(driver, 'event', track_event))
 
 
 def send_driver_change(team_id, driver, driver_idx):
@@ -268,12 +282,7 @@ def send_driver_change(team_id, driver, driver_idx):
     teams[team_id]['currentDriver'] = driver['UserName']
 
     print(json.dumps(track_event))
-
-    try:
-        connector.publish(
-            json.dumps(to_message(driver, 'event', track_event)))
-    except Exception as send_exception:
-        print(UNABLE_TO_PUBLISH_EVENT + str(send_exception))
+    publish_for_event_no(to_message(driver, 'event', track_event))
 
 
 def send_lap_change(driver, driver_idx):
@@ -281,12 +290,7 @@ def send_lap_change(driver, driver_idx):
     track_event['Type'] = 'Lap'
 
     print(json.dumps(track_event))
-
-    try:
-        connector.publish(
-            json.dumps(to_message(driver, 'event', track_event)))
-    except Exception as send_exception:
-        print(UNABLE_TO_PUBLISH_EVENT + str(send_exception))
+    publish_for_event_no(to_message(driver, 'event', track_event))
 
 
 # our main loop, where we retrieve data
@@ -387,14 +391,9 @@ def loop():
 
     #    print("after while")
     if check_session_change():
-        try:
-            session_event = generate_session_event()
-            print(json.dumps(session_event))
-            connector.publish(json.dumps(
-                to_message(ir['DriverInfo']['Drivers'][0], 'sessionInfo',
-                           session_event)))
-        except Exception as send_exception:
-            print(UNABLE_TO_PUBLISH_EVENT + str(send_exception))
+        session_event = generate_session_event()
+        print(json.dumps(session_event))
+        publish_for_event_no(to_message(ir['DriverInfo']['Drivers'][0], 'sessionInfo', session_event))
 
 
 def banner():

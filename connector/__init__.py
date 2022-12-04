@@ -27,19 +27,22 @@ class Connector:
     def publish(self, json_data):
         try:
             json_data = json_data.replace('\\u00fc', 'ü')\
+                .replace('\\u00ed', 'í')\
+                .replace('\\u00e9', 'é')\
+                .replace('\\u00e1', 'á')\
+                .replace('\\u00f3', 'ó')\
                 .replace('\\u00f6', 'ö')\
                 .replace('\\u00e4', 'ä')\
                 .replace('\\00df', 'ß')\
                 .replace('\\u00dc', 'Ü')\
                 .replace('\\u00d6', 'Ö')\
-                .replace('\\u00ed', 'í')\
                 .replace('\\u00c4', 'Ä').encode('utf-8')
 
             logging.info(json_data)
             if self.post_url != '':
                 response = requests.post(self.post_url, data=json_data,
                                          headers=self.headers, timeout=10.0)
-                return response
+                return response.content
 
         except Exception as ex:
             print('Unable to publish data: ' + str(ex))
